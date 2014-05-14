@@ -143,6 +143,7 @@ thread 4 end    800804.83475575
 
 ### Advance
 
+#### thread local storage api, 线程本地存储
  - `threadpool_epoll.tls_set(key, value)`
 
  - `threadpool_epoll.tls_get(key)`
