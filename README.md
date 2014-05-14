@@ -3,7 +3,7 @@ lua-threadpool
 
 threadpool for lua and luajit, threadpool for fend.epoll
 
-## epoll threadpool(依赖fend.epoll, luajit)
+## Epoll Threadpool(依赖fend.epoll, luajit)
 
 ### Example
 
@@ -147,7 +147,7 @@ thread 4 end    800804.83475575
 
  - `threadpool_epoll.tls_get(key)`
 
-## base threadpool(lua, luajit)
+## Base Threadpool(lua)
 
 ### diff
 
