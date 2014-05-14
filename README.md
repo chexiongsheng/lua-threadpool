@@ -116,30 +116,30 @@ thread 4 end    800804.83475575
 
 ### Basic
 
- - `threadpool_epoll.init(cfg)`
-   cfg.logger 日志打印器
-   cfg.growing_thread_num 协程池增长数量
-   cfg.init_thread_num 可选，协程初始数量
-   cfg.upper_thread_num 可选，协程最大数量
-   cfg.epoll fend.epoll对象
+ - `threadpool_epoll.init(cfg)`  
+   cfg.logger 日志打印器  
+   cfg.growing_thread_num 协程池增长数量  
+   cfg.init_thread_num 可选，协程初始数量  
+   cfg.upper_thread_num 可选，协程最大数量  
+   cfg.epoll fend.epoll对象  
 
- - `threadpool_epoll.work(job_func)`
-   job_func 是协程函数体
+ - `threadpool_epoll.work(job_func)`  
+   job_func 是协程函数体  
 
- - `threadpool_epoll.wait([event], internal)`
-   event 事件，可选参数，可以是任何类型，只要能标识一个事件即可，不填超时返回0, 否则返回TIMEOUT错误码
-   internal 等待间隔
+ - `threadpool_epoll.wait([event], internal)`  
+   event 事件，可选参数，可以是任何类型，只要能标识一个事件即可，不填超时返回0, 否则返回TIMEOUT错误码  
+   internal 等待间隔  
 
- - `threadpool_epoll.wait_until(cond_func)`
-   cond_func function类型，返回false一直等待
+ - `threadpool_epoll.wait_until(cond_func)`  
+   cond_func function类型，返回false一直等待  
  
- - `threadpool.running.id`
-   正在运行的协程id
+ - `threadpool.running.id`  
+   正在运行的协程id  
 
- - `threadpool_epoll.notify(thread_id, event, ...)`
-   thread_id 要唤醒的协程id
-   event 在调用wait时传入的事件
-   ... 其它参数，将会作为wait的返回值
+ - `threadpool_epoll.notify(thread_id, event, ...)`  
+   thread_id 要唤醒的协程id  
+   event 在调用wait时传入的事件  
+   ... 其它参数，将会作为wait的返回值  
 
 ### Advance
 
