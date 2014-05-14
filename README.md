@@ -89,6 +89,8 @@ end
 ```
 
 ### Output
+
+```text
 tart   800795.83389947
 thread 3 started        800795.83396331
 thread 4 started        800795.83399728
@@ -106,5 +108,5 @@ notify thread id=       8
 thread 1 end    800804.8341172
 set cond true
 thread 4 end    800804.83475575
-
+```
 
