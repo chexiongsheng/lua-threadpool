@@ -11,8 +11,7 @@ local threadpool= {
 
 local table_push = _G.table.insert
 local table_pop  = _G.table.remove
---空闲任务队列
---待执行等函数队列
+--TODO: 空闲过多时应该要回收
 local idle_thread_stack = {}
 local thread_list = {}
 
@@ -118,6 +117,7 @@ threadpool.check_timeout = function(now)
     local thread
     local workingcount = 0 
     local next_timeout
+    --TODO: 效率不高
     for i =1, #thread_list do
         thread = thread_list[i]
         local timeout
