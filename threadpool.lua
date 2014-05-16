@@ -11,11 +11,12 @@ local threadpool= {
 
 local table_push = _G.table.insert
 local table_pop  = _G.table.remove
---TODO: 空闲过多时应该要回收
+local table_remove = _G.table.remove
 local idle_thread_stack = {}
 local thread_list = {}
+local working_flag = {}
 
-local logger, growing_thread_num, upper_thread_num
+local logger, growing_num, upper_num, upper_idle_num
 
 local function err_handler(e)
     return tostring(e)..'\n'..tostring(debug.traceback())
@@ -23,6 +24,19 @@ end
 
 local function xp_warper(func, ...) --在函数和参数之间插入一个err_handler
     return func, err_handler, ...
+end
+
+local try_free_idle = function()
+    while #idle_thread_stack > upper_idle_num and (not working_flag[#thread_list]) do
+        local last_id = #thread_list
+        for i, thread in ipairs(idle_thread_stack) do
+            if thread.id == last_id then
+                table_remove(idle_thread_stack, i)
+                thread_list[last_id] = nil
+                break
+            end
+        end
+    end
 end
 
 threadpool.grow = function (num)
@@ -38,6 +52,8 @@ threadpool.grow = function (num)
                 tp.running = thread.parent
                 thread.status = IDLING
                 table_push(idle_thread_stack, thread)
+                assert(working_flag[thread.id])
+                working_flag[thread.id] = nil
             end 
         end)
 
@@ -50,6 +66,7 @@ threadpool.grow = function (num)
                 assert(self.status == IDLING)
                 if func and type(func) == "function" then 
                     self.status = PROCESSING
+                    working_flag[self.id] = self.id
                     return self:resume(func, ...)
                 else
                     table_push(idle_thread_stack, thread)
@@ -80,12 +97,12 @@ end
 threadpool.work = function(...)
     local thread = table_pop(idle_thread_stack)
     if not thread then
-        if #thread_list >= upper_thread_num then
-            logger.error('reach the upper_thread_num', upper_thread_num, ' #thread_list=', #thread_list)
+        if #thread_list >= upper_num then
+            logger.error('reach the upper_thread_num', upper_num, ' #thread_list=', #thread_list)
             return false
         end
-        logger.warn('not idle thread, thread count =', #thread_list, 'growing =', growing_thread_num)
-        threadpool.grow(math.min(growing_thread_num, upper_thread_num - #thread_list))
+        logger.warn('not idle thread, thread count =', #thread_list, 'growing =', growing_num)
+        threadpool.grow(math.min(growing_num, upper_num - #thread_list))
         thread = table_pop(idle_thread_stack)
     end
     return thread:call(...)
@@ -93,11 +110,13 @@ end
 
 threadpool.init = function(cfg)
     logger = assert(cfg.logger, 'logger must provide!')
-    growing_thread_num = assert(cfg.growing_thread_num, 'growing_thread_num must provide!')
-    assert(growing_thread_num > 0)
-    upper_thread_num = cfg.upper_thread_num or 1000
-    local init_thread_num = cfg.init_thread_num or growing_thread_num
-    assert(upper_thread_num > init_thread_num and upper_thread_num > growing_thread_num)
+    growing_num = assert(cfg.growing_thread_num, 'growing_thread_num must provide!')
+    assert(growing_num > 0)
+    upper_num = cfg.upper_thread_num or 1000
+    upper_idle_num = cfg.upper_idl_thread_num or math.floor(upper_num / 10)
+    assert(upper_num > upper_idle_num)
+    local init_thread_num = cfg.init_thread_num or growing_num
+    assert(upper_num > init_thread_num and upper_num > growing_num)
     threadpool.grow(init_thread_num)
 end
 
@@ -117,32 +136,31 @@ threadpool.check_timeout = function(now)
     local thread
     local workingcount = 0 
     local next_timeout
-    --TODO: 效率不高
-    for i =1, #thread_list do
+    for i in pairs(working_flag) do
         thread = thread_list[i]
         local timeout
-        if thread.status == PROCESSING then
-            assert(thread._timeout_) --假如PROCESS而且让出协程不可能timeout为空
-            if thread._timeout_ <= now then
-                local resume_ret
-                if thread._event_ then 
-                    resume_ret, timeout = thread:resume(TIMEOUT, thread._event_)
-                else
-                    resume_ret, timeout = thread:resume(0)
-                end
-                if resume_ret then
-                    workingcount = workingcount + 1
-                else
-                    logger.error('threadpool.check_timeout, resume error:', timeout)
-                end
-           else
-               timeout = thread._timeout_
-           end
-           if timeout then
-               next_timeout = (next_timeout == nil) and timeout or math.min(next_timeout, timeout)
-           end
+        assert(thread.status == PROCESSING)
+        assert(thread._timeout_) --假如PROCESS而且让出协程不可能timeout为空
+        if thread._timeout_ <= now then
+            local resume_ret
+            if thread._event_ then 
+                resume_ret, timeout = thread:resume(TIMEOUT, thread._event_)
+            else
+                resume_ret, timeout = thread:resume(0)
+            end
+            if resume_ret then
+                workingcount = workingcount + 1
+            else
+                logger.error('threadpool.check_timeout, resume error:', timeout)
+            end
+        else
+            timeout = thread._timeout_
+        end
+        if timeout then
+            next_timeout = (next_timeout == nil) and timeout or math.min(next_timeout, timeout)
         end
     end
+    try_free_idle()
     return next_timeout, workingcount
 end
 

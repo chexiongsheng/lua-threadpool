@@ -26,6 +26,7 @@ local epoll, threadpool_timer, next_timeout
 threadpool_epoll.init = function(cfg)
     epoll = assert(cfg.epoll)
     threadpool_timer = epoll:add_timer(0, 0, function()
+        --TODO: check_timeout应该优先级最低，先处理其它事件，比如要等待的响应消息
         next_timeout = threadpool.check_timeout(epoll:now())
         return next_timeout and math.max(TINY_INTERVAL, next_timeout - epoll:now()) or 0
     end)

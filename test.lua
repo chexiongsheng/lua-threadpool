@@ -78,6 +78,12 @@ threadpool.work(function()
     print('thread 4 end', epoll:now())
 end)
 
+--for i = 1, 800 do
+--    threadpool.work(function()
+--        threadpool.wait(1)
+--    end)
+--end
+
 local runing = true
 --epoll loop
 while runing do
