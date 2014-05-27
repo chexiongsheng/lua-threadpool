@@ -55,8 +55,8 @@ local wait = function(event, interval)
 end
 threadpool_epoll.wait = wait
 
-threadpool_epoll.wait_until = function(cond_func) 
-    while not cond_func() do
+threadpool_epoll.wait_until = function(cond_func, ...) 
+    while not cond_func(...) do
         wait(0)
     end
 end
@@ -70,6 +70,29 @@ threadpool_epoll.notify = function(...)
         end
     end
     return rc
+end
+
+local _is_my_turn = function(critical_section)
+    return critical_section[1] == threadpool.running.id
+end
+local critical_section_mt = {
+    __index = {
+        enter = function(t)
+            table.insert(t, threadpool.running.id)
+            threadpool_epoll.wait_until(_is_my_turn, t)
+        end,
+        here = function(t)
+            return t[1]
+        end,
+        leave = function(t)
+            assert(t[1] == threadpool.running.id)
+            table.remove(t, 1)
+        end,
+    }
+}
+
+threadpool_epoll.new_critical_section = function()
+    return setmetatable({}, critical_section_mt)
 end
 
 return threadpool_epoll

@@ -72,10 +72,27 @@ epoll:add_timer(9, 0, function()
     cond = true
 end)
 
+local cs = threadpool.new_critical_section()
 threadpool.work(function()
     print('thread 4 started', epoll:now())
     threadpool.wait_until(function() return cond end)
     print('thread 4 end', epoll:now())
+
+    print('thread 4 enter critical_section', epoll:now())
+    cs:enter()
+    print('thread 4 entered critical_section', epoll:now())
+    threadpool.wait(6)
+    cs:leave()
+    print('thread 4 leave critical_section', epoll:now())
+end)
+threadpool.work(function()
+    threadpool.wait(10)
+    print('thread 5 enter critical_section', epoll:now())
+    cs:enter()
+    print('thread 5 entered critical_section', epoll:now())
+    threadpool.wait(2)
+    cs:leave()
+    print('thread 5 leave critical_section', epoll:now())
 end)
 
 --for i = 1, 800 do
@@ -83,6 +100,7 @@ end)
 --        threadpool.wait(1)
 --    end)
 --end
+
 
 local runing = true
 --epoll loop
