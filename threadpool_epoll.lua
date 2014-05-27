@@ -81,7 +81,7 @@ local critical_section_mt = {
             table.insert(t, threadpool.running.id)
             threadpool_epoll.wait_until(_is_my_turn, t)
         end,
-        here = function(t)
+        entered_thread = function(t)
             return t[1]
         end,
         leave = function(t)
