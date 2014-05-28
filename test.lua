@@ -17,7 +17,7 @@
 local dispatcher = require "fend.epoll"
 local epoll = dispatcher()
 
-local threadpool = require 'threadpool_epoll'
+local threadpool = require 'threadpool_ext'
 threadpool.init({
     logger = {
         warn = print,

@@ -1,7 +1,7 @@
 --
 --------------------------------------------------------------------------------
---         FILE:  threadpool_epoll.lua
---        USAGE:  ./threadpool_epoll.lua 
+--         FILE:  threadpool_ext.lua
+--        USAGE:  ./threadpool_ext.lua 
 --  DESCRIPTION:  
 --      OPTIONS:  ---
 -- REQUIREMENTS:  ---
@@ -17,13 +17,13 @@
 
 local threadpool = require 'threadpool'
 
-local threadpool_epoll = setmetatable({}, {__index = threadpool})
+local threadpool_ext = setmetatable({}, {__index = threadpool})
 
 local TINY_INTERVAL = 1/1000 --微秒级别
 
 local epoll, threadpool_timer, next_timeout
 
-threadpool_epoll.init = function(cfg)
+threadpool_ext.init = function(cfg)
     epoll = assert(cfg.epoll)
     threadpool_timer = epoll:add_timer(0, 0, function()
         --TODO: check_timeout应该优先级最低，先处理其它事件，比如要等待的响应消息
@@ -33,7 +33,7 @@ threadpool_epoll.init = function(cfg)
     return threadpool.init(cfg)
 end
 
-threadpool_epoll.work = function(...)
+threadpool_ext.work = function(...)
     local rc, timeout = threadpool.work(...)
     if rc and timeout then
         if (not next_timeout) or timeout < next_timeout then
@@ -53,15 +53,15 @@ local wait = function(event, interval)
     local timeout = interval + epoll:now()
     return threadpool.wait(event, timeout)
 end
-threadpool_epoll.wait = wait
+threadpool_ext.wait = wait
 
-threadpool_epoll.wait_until = function(cond_func, ...) 
+threadpool_ext.wait_until = function(cond_func, ...) 
     while not cond_func(...) do
         wait(0)
     end
 end
 
-threadpool_epoll.notify = function(...)
+threadpool_ext.notify = function(...)
     local rc, timeout = threadpool.notify(...)
     if rc and timeout then
         if (not next_timeout) or timeout < next_timeout then
@@ -79,7 +79,7 @@ local critical_section_mt = {
     __index = {
         enter = function(t)
             table.insert(t, threadpool.running.id)
-            threadpool_epoll.wait_until(_is_my_turn, t)
+            threadpool_ext.wait_until(_is_my_turn, t)
         end,
         entered_thread = function(t)
             return t[1]
@@ -91,11 +91,11 @@ local critical_section_mt = {
     }
 }
 
-threadpool_epoll.new_critical_section = function()
+threadpool_ext.new_critical_section = function()
     return setmetatable({}, critical_section_mt)
 end
 
-return threadpool_epoll
+return threadpool_ext
 
 
 
