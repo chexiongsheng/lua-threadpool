@@ -39,7 +39,7 @@ epoll:add_timer(2, 0, function()
         threadpool.wait(2)
         print('thread 1 wait 1', epoll:now())
         threadpool.wait(3)
-        thread_id = threadpool.running.id
+        thread_id = threadpool.running()
         print('thread 1 wait 2', epoll:now(), thread_id)
         print(threadpool.wait(env_seq, 100))
         print('thread 1 end', epoll:now())

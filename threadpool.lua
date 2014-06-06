@@ -1,22 +1,21 @@
 local TIMEOUT = 1
 
-local IDLING = 0 --闲
-local PROCESSING = 1 --正在干活
-
 local threadpool= {
-    IDLING = IDLING,
-    PROCESSING = PROCESSING,
-    TIMEOUT = TIMEOUT,
+    TIMEOUT = TIMEOUT
 } 
 
-local table_push = _G.table.insert
-local table_pop  = _G.table.remove
 local table_remove = _G.table.remove
+local co_yield = _G.coroutine.yield
+local co_resume = _G.coroutine.resume
 local idle_thread_stack = {}
+local idle_thread_stack_len = 0
 local thread_list = {}
 local working_flag = {}
+local ctx_list = {}
 
 local logger, growing_num, upper_num, upper_idle_num
+
+local running_ctx
 
 local function err_handler(e)
     return tostring(e)..'\n'..tostring(debug.traceback())
@@ -27,12 +26,14 @@ local function xp_warper(func, ...) --在函数和参数之间插入一个err_ha
 end
 
 local try_free_idle = function()
-    while #idle_thread_stack > upper_idle_num and (not working_flag[#thread_list]) do
+    while idle_thread_stack_len > upper_idle_num and (not working_flag[#thread_list]) do
         local last_id = #thread_list
         for i, thread in ipairs(idle_thread_stack) do
-            if thread.id == last_id then
+            if thread.id == last_id then -- clean up
                 table_remove(idle_thread_stack, i)
+                idle_thread_stack_len = #idle_thread_stack
                 thread_list[last_id] = nil
+                ctx_list[last_id] = nil
                 break
             end
         end
@@ -42,70 +43,31 @@ end
 threadpool.grow = function (num)
     assert(num > 0)
     for i = 1, num do 
-        local co = coroutine.create(function(tp, thread)
-            local pcall_suc, ret
+        local coe = coroutine.wrap(function(thread_id, ctx)
             while true do 
-                pcall_suc, ret = xpcall(xp_warper(coroutine.yield()))
+                local pcall_suc, ret = xpcall(xp_warper(co_yield()))
                 if not pcall_suc then
                     logger.error('error in thread job:'..tostring(ret))
                 end
-                tp.running = thread.parent
-                thread.status = IDLING
-                table_push(idle_thread_stack, thread)
-                assert(working_flag[thread.id])
-                working_flag[thread.id] = nil
+                running_ctx = ctx.parent
+                idle_thread_stack_len = idle_thread_stack_len + 1
+                idle_thread_stack[idle_thread_stack_len] = thread_id
+                working_flag[thread_id] = nil
             end 
         end)
 
-        thread = {
-            co = co,
-            id = #thread_list+ 1,
-            status = IDLING, --任务状态
-            tls = {},
-            call = function (self,func,...)
-                assert(self.status == IDLING)
-                if func and type(func) == "function" then 
-                    self.status = PROCESSING
-                    working_flag[self.id] = self.id
-                    return self:resume(func, ...)
-                else
-                    table_push(idle_thread_stack, thread)
-                    assert(false,"func is ".. tostring(func) .. '!')
-                end 
-            end,
-            resume = function (self, ...)
-                self.parent = threadpool.running
-                threadpool.running = self
-                return coroutine.resume(self.co, ...)
-            end,
+        table.insert(thread_list,  coe)
+        local thread_id = #thread_list
+        local ctx = {
+            id = thread_id,
+            coe = coe,
+            tls = {}
         }
-
-        table_push(thread_list,  thread)
-        table_push(idle_thread_stack, thread)
-        coroutine.resume(co, threadpool, thread)
+        table.insert(ctx_list, ctx)
+        idle_thread_stack_len = idle_thread_stack_len + 1
+        idle_thread_stack[idle_thread_stack_len] = thread_id
+        coe(thread_id, ctx) --init
     end
-end
-
-threadpool.tls_set = function(k, v)
-    threadpool.running.tls[k] = v
-end
-
-threadpool.tls_get = function(k)
-    return threadpool.running.tls[k]
-end
-
-threadpool.work = function(...)
-    local thread = table_pop(idle_thread_stack)
-    if not thread then
-        if #thread_list >= upper_num then
-            logger.error('reach the upper_thread_num', upper_num, ' #thread_list=', #thread_list)
-            return false
-        end
-        logger.warn('not idle thread, thread count =', #thread_list, 'growing =', growing_num)
-        threadpool.grow(math.min(growing_num, upper_num - #thread_list))
-        thread = table_pop(idle_thread_stack)
-    end
-    return thread:call(...)
 end
 
 threadpool.init = function(cfg)
@@ -120,33 +82,83 @@ threadpool.init = function(cfg)
     threadpool.grow(init_thread_num)
 end
 
+threadpool.tls_set = function(k, v)
+    running_ctx.tls[k] = v
+end
+
+threadpool.tls_get = function(k)
+    return running_ctx.tls[k]
+end
+
+threadpool.work = function(func, ...)
+    assert(type(func) == "function")
+    if idle_thread_stack_len == 0 then
+        if #thread_list >= upper_num then
+            logger.error('reach the upper_thread_num', upper_num, ' #thread_list=', #thread_list)
+            return false
+        end
+        logger.warn('not idle thread, thread count =', #thread_list, 'growing =', growing_num)
+        threadpool.grow(math.min(growing_num, upper_num - #thread_list))
+    end
+    --pop
+    local thread_id = idle_thread_stack[idle_thread_stack_len]
+    idle_thread_stack[idle_thread_stack_len] = nil
+    idle_thread_stack_len = idle_thread_stack_len - 1
+
+    working_flag[thread_id] = thread_id
+
+    local ctx = ctx_list[thread_id]
+    ctx.parent = running_ctx
+    running_ctx = ctx
+
+    return true, thread_list[thread_id](func, ...)
+end
+
+threadpool.running = function()
+    return running_ctx and running_ctx.id
+end
+
 threadpool.wait = function(event, timeout)
     if timeout == nil then
         timeout = event
         event = nil
     end
     assert(timeout)
-    threadpool.running._event_ = event
-    threadpool.running._timeout_ = timeout
-    threadpool.running = threadpool.running.parent
-    return coroutine.yield(timeout)
+    running_ctx.event = event
+    running_ctx.timeout = timeout
+    running_ctx = running_ctx.parent
+    return co_yield(timeout)
 end
 
+threadpool.notify = function(thread_id, event, ...)
+    local ctx = ctx_list[thread_id]
+    if ctx == nil then
+        logger.warn('try to wakeup thread not existed, id='..tostring(thread_id))
+    elseif not working_flag[thread_id] then
+        logger.warn('try to wakeup an idle thread, id='..tostring(thread_id))
+    elseif ctx.event ~= event then
+        logger.warn('unexpect event, expect['..tostring(thread._event_)..'], but recv ['..tostring(event)..']')
+    else
+        ctx.parent = running_ctx
+        running_ctx = ctx
+        return true, thread_list[thread_id](...)
+    end
+    return false
+end
+
+
 threadpool.check_timeout = function(now)
-    local thread
     local workingcount = 0 
     local next_timeout
-    for i in pairs(working_flag) do
-        thread = thread_list[i]
+    for thread_id in pairs(working_flag) do
+        local ctx = ctx_list[thread_id]
         local timeout
-        assert(thread.status == PROCESSING)
-        assert(thread._timeout_) --假如PROCESS而且让出协程不可能timeout为空
-        if thread._timeout_ <= now then
+        if ctx.timeout <= now then
             local resume_ret
-            if thread._event_ then 
-                resume_ret, timeout = thread:resume(TIMEOUT, thread._event_)
+            if ctx.event then 
+                resume_ret, timeout = threadpool.notify(thread_id, ctx.event, TIMEOUT, ctx.event)
             else
-                resume_ret, timeout = thread:resume(0)
+                resume_ret, timeout = threadpool.notify(thread_id, nil, 0)
             end
             if resume_ret then
                 workingcount = workingcount + 1
@@ -154,7 +166,7 @@ threadpool.check_timeout = function(now)
                 logger.error('threadpool.check_timeout, resume error:', timeout)
             end
         else
-            timeout = thread._timeout_
+            timeout = ctx.timeout
         end
         if timeout then
             next_timeout = (next_timeout == nil) and timeout or math.min(next_timeout, timeout)
@@ -162,20 +174,6 @@ threadpool.check_timeout = function(now)
     end
     try_free_idle()
     return next_timeout, workingcount
-end
-
-threadpool.notify = function(id, event, ...)
-    local thread = thread_list[id]
-    if thread == nil then
-        logger.warn('try to wakeup thread not existed, id='..tostring(id))
-    elseif thread.status ~= PROCESSING then
-        logger.warn('try to wakeup an idle thread, id='..tostring(id))
-    elseif thread._event_ ~= event then
-        logger.warn('unexpect event, expect['..tostring(thread._event_)..'], but recv ['..tostring(event)..']')
-    else
-        return thread:resume(...)
-    end
-    return false
 end
 
 return threadpool

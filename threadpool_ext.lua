@@ -73,19 +73,19 @@ threadpool_ext.notify = function(...)
 end
 
 local _is_my_turn = function(critical_section)
-    return critical_section[1] == threadpool.running.id
+    return critical_section[1] == threadpool.running()
 end
 local critical_section_mt = {
     __index = {
         enter = function(t)
-            table.insert(t, threadpool.running.id)
+            table.insert(t, threadpool.running())
             threadpool_ext.wait_until(_is_my_turn, t)
         end,
         entered_thread = function(t)
             return t[1]
         end,
         leave = function(t)
-            assert(t[1] == threadpool.running.id)
+            assert(t[1] == threadpool.running())
             table.remove(t, 1)
         end,
     }
