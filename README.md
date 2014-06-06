@@ -1,7 +1,7 @@
 lua-threadpool
 ==============
 
-threadpool for lua and luajit, threadpool for fend.epoll
+Faster, easier and more powerful lua coroutine library
 
 ## Epoll Threadpool(依赖fend.epoll, luajit)
 
