@@ -33,7 +33,7 @@ epoll:add_timer(2, 0, function()
         threadpool.wait(2)
         print('thread 1 wait 1', epoll:now())
         threadpool.wait(3)
-        thread_id = threadpool.running.id
+        thread_id = threadpool.running()
         print('thread 1 wait 2', epoll:now(), thread_id)
         print(threadpool.wait(env_seq, 100))
         print('thread 1 end', epoll:now())
@@ -133,7 +133,7 @@ thread 4 end    800804.83475575
  - `threadpool_ext.wait_until(cond_func)`  
    cond_func function类型，返回false一直等待  
  
- - `threadpool.running.id`  
+ - `threadpool.running()`  
    正在运行的协程id  
 
  - `threadpool_ext.notify(thread_id, event, ...)`  
