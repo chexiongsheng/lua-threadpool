@@ -121,7 +121,7 @@ thread 4 end    800804.83475575
    cfg.growing_thread_num 协程池增长数量  
    cfg.init_thread_num 可选，协程初始数量  
    cfg.upper_thread_num 可选，协程最大数量  
-   cfg.epoll fend.epoll对象  
+   cfg.time_service time_service对象，需要提供now， add_timer方法
 
  - `threadpool_ext.work(job_func)`  
    job_func 是协程函数体  
