@@ -21,14 +21,14 @@ local threadpool_ext = setmetatable({}, {__index = threadpool})
 
 local TINY_INTERVAL = 1/1000 --微秒级别
 
-local epoll, threadpool_timer, next_timeout
+local time_service, threadpool_timer, next_timeout
 
 threadpool_ext.init = function(cfg)
-    epoll = assert(cfg.epoll)
-    threadpool_timer = epoll:add_timer(0, 0, function()
+    time_service = assert(cfg.time_service)
+    threadpool_timer = time_service:add_timer(0, 0, function()
         --TODO: check_timeout应该优先级最低，先处理其它事件，比如要等待的响应消息
-        next_timeout = threadpool.check_timeout(epoll:now())
-        return next_timeout and math.max(TINY_INTERVAL, next_timeout - epoll:now()) or 0
+        next_timeout = threadpool.check_timeout(time_service:now())
+        return next_timeout and math.max(TINY_INTERVAL, next_timeout - time_service:now()) or 0
     end)
     return threadpool.init(cfg)
 end
@@ -38,7 +38,7 @@ threadpool_ext.work = function(...)
     if rc and timeout then
         if (not next_timeout) or timeout < next_timeout then
             next_timeout = timeout
-            threadpool_timer:set(math.max(TINY_INTERVAL, timeout - epoll:now()))
+            threadpool_timer:set(math.max(TINY_INTERVAL, timeout - time_service:now()))
         end
     end
     return rc
@@ -50,7 +50,7 @@ local wait = function(event, interval)
         event = nil
     end
     assert(interval)
-    local timeout = interval + epoll:now()
+    local timeout = interval + time_service:now()
     return threadpool.wait(event, timeout)
 end
 threadpool_ext.wait = wait
@@ -66,7 +66,7 @@ threadpool_ext.notify = function(...)
     if rc and timeout then
         if (not next_timeout) or timeout < next_timeout then
             next_timeout = timeout
-            threadpool_timer:set(math.max(TINY_INTERVAL, timeout - epoll:now()))
+            threadpool_timer:set(math.max(TINY_INTERVAL, timeout - time_service:now()))
         end
     end
     return rc
