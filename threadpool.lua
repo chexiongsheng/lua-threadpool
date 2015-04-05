@@ -1,7 +1,6 @@
 local TIMEOUT = 1
 
 local threadpool= {
-    TIMEOUT = TIMEOUT
 } 
 
 local table_remove = _G.table.remove
@@ -71,6 +70,7 @@ threadpool.grow = function (num)
 end
 
 threadpool.init = function(cfg)
+    TIMEOUT = cfg.enum_timeout or TIMEOUT
     logger = assert(cfg.logger, 'logger must provide!')
     growing_num = assert(cfg.growing_thread_num, 'growing_thread_num must provide!')
     assert(growing_num > 0)
