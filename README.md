@@ -19,7 +19,7 @@ threadpool.init({
         debug = print
     },
     growing_thread_num = 10,
-    epoll = epoll,
+    time_service = epoll,
 })
 
 local env_seq = 2313141232
