@@ -137,7 +137,7 @@ threadpool.notify = function(thread_id, event, ...)
     elseif not working_flag[thread_id] then
         logger.warn('try to wakeup an idle thread, id='..tostring(thread_id))
     elseif ctx.event ~= event then
-        logger.warn('unexpect event, expect['..tostring(thread._event_)..'], but recv ['..tostring(event)..']')
+        logger.warn('unexpect event, expect['..tostring(ctx.event)..'], but recv ['..tostring(event)..']')
     else
         ctx.parent = running_ctx
         running_ctx = ctx
