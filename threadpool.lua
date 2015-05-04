@@ -27,8 +27,8 @@ end
 local try_free_idle = function()
     while idle_thread_stack_len > upper_idle_num and (not working_flag[#thread_list]) do
         local last_id = #thread_list
-        for i, thread in ipairs(idle_thread_stack) do
-            if thread.id == last_id then -- clean up
+        for i, thread_id in ipairs(idle_thread_stack) do
+            if thread_id == last_id then -- clean up
                 table_remove(idle_thread_stack, i)
                 idle_thread_stack_len = #idle_thread_stack
                 thread_list[last_id] = nil
