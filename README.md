@@ -126,7 +126,7 @@ thread 4 end    800804.83475575
  - `threadpool_ext.work(job_func)`  
    job_func 是协程函数体  
 
- - `threadpool_ext.wait([event], internal)`  
+ - `threadpool_ext.wait([event], interval)`  
    event 事件，可选参数，可以是任何类型，只要能标识一个事件即可，不填超时返回0, 否则返回TIMEOUT错误码  
    internal 等待间隔  
 
